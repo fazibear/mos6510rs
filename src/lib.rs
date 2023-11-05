@@ -258,7 +258,7 @@ impl CPU {
             }
             Instruction::JumpSubroutine => {
                 self.cycles += 6;
-                self.push((((self.registers.program_counter + 1) & 0xffff) >> 8) as u8);
+                self.push(((self.registers.program_counter + 1) >> 8) as u8);
                 self.push(((self.registers.program_counter + 1) & 0xff) as u8);
                 let mut tmp = self.read_byte_and_increment_pc() as u16;
                 tmp |= (self.read_byte_and_increment_pc() as u16) << 8;
@@ -409,15 +409,11 @@ impl CPU {
 
     pub fn push(&mut self, value: u8) {
         self.write_memory(0x100 + self.registers.stack_pointer as u16, value);
-        if self.registers.stack_pointer > 0 {
-            self.registers.stack_pointer -= 1;
-        }
+        self.registers.stack_pointer = self.registers.stack_pointer.saturating_sub(1);
     }
 
     pub fn pop(&mut self) -> u8 {
-        if self.registers.stack_pointer < 0xff {
-            self.registers.stack_pointer += 1;
-        }
+        self.registers.stack_pointer = self.registers.stack_pointer.saturating_add(1);
         self.read_byte(0x100 + self.registers.stack_pointer as u16)
     }
 
@@ -466,7 +462,7 @@ impl CPU {
     }
 
     fn increment_pc(&mut self) {
-        self.registers.program_counter = (self.registers.program_counter + 1) & 0xffff;
+        self.registers.program_counter += 1;
     }
 
     fn get_address(&mut self, mode: Mode) -> u8 {
@@ -489,7 +485,7 @@ impl CPU {
                 self.cycles += 4;
                 let address = self.read_byte_and_increment_pc() as u16
                     | (self.read_byte_and_increment_pc() as u16) << 8;
-                let address2 = (address + self.registers.x as u16) & 0xffff;
+                let address2 = address + self.registers.x as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
                 };
@@ -499,7 +495,7 @@ impl CPU {
                 self.cycles += 4;
                 let address = self.read_byte_and_increment_pc() as u16
                     | (self.read_byte_and_increment_pc() as u16) << 8;
-                let address2 = (address + self.registers.y as u16) & 0xffff;
+                let address2 = address + self.registers.y as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
                 };
@@ -527,7 +523,7 @@ impl CPU {
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 let address2 = (self.read_byte(address) as u16)
                     | ((self.read_byte((address + 1) & 0xff) as u16) << 8u8);
-                address = (address2 + self.registers.y as u16) & 0xffff;
+                address = address2 + self.registers.y as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
                 }
@@ -649,7 +645,7 @@ impl CPU {
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 let mut address2 = self.read_byte(address) as u16;
                 address2 |= (self.read_byte((address + 1) & 0xff) as u16) << 8;
-                address = (address2 + self.registers.y as u16) & 0xffff;
+                address = address2 + self.registers.y as u16;
                 self.write_memory(address, value);
             }
             Mode::Accumulator => {

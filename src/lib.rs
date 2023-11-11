@@ -471,7 +471,7 @@ impl CPU {
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
-        println!("{} <- {}", address, value);
+        //println!("{} <- {}", address, value);
         if (address & 0xfc00) == 0xd400 {
             self.sid.write((address & 0x1f) as u8, value);
         } else {

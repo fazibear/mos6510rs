@@ -4,6 +4,7 @@ pub mod opcodes;
 pub mod registers;
 pub mod status_flags;
 pub mod memory;
+pub mod sid;
 
 use instruction::Instruction;
 use mode::Mode;
@@ -11,17 +12,19 @@ use opcodes::OpCodes;
 use registers::Registers;
 use status_flags::StatusFlags;
 use memory::Memory;
+use sid::Sid;
 
 pub struct CPU {
     pub registers: Registers,
     pub status_flags: StatusFlags,
     pub memory: Box<dyn Memory>,
+    pub sid: Box<dyn Sid>,
     pub cycles: u64,
     pub opcodes: OpCodes,
 }
 
 impl CPU {
-    pub fn new(memory: Box<dyn Memory>) -> CPU {
+    pub fn new(memory: Box<dyn Memory>, sid: Box<dyn Sid>) -> CPU {
         let memory = memory;
         let cycles = 0;
         let registers = Registers::new();
@@ -34,6 +37,7 @@ impl CPU {
             cycles,
             opcodes,
             status_flags,
+            sid,
         }
     }
 
@@ -56,7 +60,7 @@ impl CPU {
 
         let (instruction, mode) = self.opcodes.get(address);
                 
-        // println!("{} {} {} {} {} {} {}", 
+        // println!("x:{} y:{} a:{} s:{} f:{} pc:{} a:{}", 
         //             self.registers.x, 
         //             self.registers.y, 
         //             self.registers.accumulator, 
@@ -72,6 +76,7 @@ impl CPU {
                     + self.get_address(mode) as u16
                     + self.status_flags.carry as u16;
                 self.status_flags.carry = tmp & 0x100 != 0;
+                self.registers.accumulator = (tmp & 0xff) as u8;
                 self.status_flags.zero = self.registers.accumulator == 0;
                 self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
                 self.status_flags.overflow =
@@ -317,6 +322,17 @@ impl CPU {
             }
             Instruction::RotateLeft => {
                 let mut tmp = self.get_address(mode) as u16;
+                let c = self.status_flags.carry as u16;
+                self.status_flags.carry = (tmp & 0x80) != 0;
+                tmp <<= 1;
+                tmp |= c;
+                tmp &= 0xff;
+                self.set_address(mode, tmp as u8);
+                self.status_flags.negative = tmp & 0x80 != 0;
+                self.status_flags.zero = tmp == 0;
+            }
+            Instruction::RotateRight => {
+                let mut tmp = self.get_address(mode) as u16;
                 let c = if (self.status_flags.carry as u16) != 0 {
                     128
                 } else {
@@ -342,9 +358,7 @@ impl CPU {
                 self.registers.accumulator = (tmp2 & 0xff) as u8;
                 self.status_flags.zero = self.registers.accumulator == 0;
                 self.status_flags.negative = self.registers.accumulator > 127;
-                self.status_flags.overflow =
-                    ((self.status_flags.carry as u16) ^ (self.registers.accumulator as u16)) & 0x80
-                        != 0;
+                self.status_flags.overflow = self.status_flags.carry ^ self.status_flags.negative;
             }
             Instruction::SetCarry => {
                 self.cycles += 2;
@@ -402,7 +416,7 @@ impl CPU {
                 self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
             }
 
-            _ => panic!("Unknown instruction!"),
+            _ => panic!("Unknown instruction: {}", instruction as u8)
         };
         self.cycles
     }
@@ -458,7 +472,11 @@ impl CPU {
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
-        self.memory.as_mut().write(address, value);
+        if (address & 0xfc00) == 0xd400 {
+            self.sid.write((address & 0x1f) as u8, value);
+        } else {
+            self.memory.as_mut().write(address, value);
+        }
     }
 
     fn increment_pc(&mut self) {

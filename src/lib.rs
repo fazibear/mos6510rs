@@ -245,16 +245,14 @@ impl CPU {
             }
             Instruction::Jump => {
                 self.cycles += 3;
-                let mut tmp = self.read_byte_and_increment_pc() as u16;
-                tmp |= (self.read_byte_and_increment_pc() as u16) << 8;
+                let address = self.read_word_and_increment_pc();
                 match mode {
                     Mode::Absolute => {
-                        self.registers.program_counter = tmp;
+                        self.registers.program_counter = address;
                     }
                     Mode::Indirect => {
-                        self.registers.program_counter = self.read_byte(tmp) as u16;
-                        self.registers.program_counter |=
-                            (self.read_byte((tmp + 1) & 0xff) as u16) << 8;
+                        let address2 = self.read_word(address);
+                        self.registers.program_counter = address2;
                         self.cycles += 2;
                     }
                     _ => panic!("Unimplemented jump addressing mode!"),
@@ -264,9 +262,7 @@ impl CPU {
                 self.cycles += 6;
                 self.push(((self.registers.program_counter + 1) >> 8) as u8);
                 self.push(((self.registers.program_counter + 1) & 0xff) as u8);
-                let mut tmp = self.read_byte_and_increment_pc() as u16;
-                tmp |= (self.read_byte_and_increment_pc() as u16) << 8;
-                self.registers.program_counter = tmp;
+                self.registers.program_counter = self.read_word_and_increment_pc();
             }
             Instruction::LoadAccumulator => {
                 self.registers.accumulator = self.get_address(mode);
@@ -566,14 +562,12 @@ impl CPU {
         match mode {
             Mode::Absolute => {
                 self.cycles += 2;
-                let mut address = self.read_byte(self.registers.program_counter - 2) as u16;
-                address |= (self.read_byte(self.registers.program_counter - 1) as u16) << 8;
+                let address = self.read_word(self.registers.program_counter - 2);
                 self.write_memory(address, value);
             }
             Mode::AbsoluteX => {
                 self.cycles += 3;
-                let mut address = self.read_byte(self.registers.program_counter - 2) as u16;
-                address |= (self.read_byte(self.registers.program_counter - 1) as u16) << 8;
+                let address = self.read_word(self.registers.program_counter - 2);
                 let mut address2 = address + self.registers.x as u16;
                 address2 &= 0xffff;
                 if (address2 & 0xff00) != (address & 0xff00) {
@@ -607,22 +601,19 @@ impl CPU {
         match mode {
             Mode::Absolute => {
                 self.cycles += 4;
-                let mut address = self.read_byte_and_increment_pc() as u16;
-                address |= (self.read_byte_and_increment_pc() as u16) << 8;
+                let address = self.read_word_and_increment_pc();
                 self.write_memory(address, value);
             }
             Mode::AbsoluteX => {
                 self.cycles += 4;
-                let mut address = self.read_byte_and_increment_pc() as u16;
-                address |= (self.read_byte_and_increment_pc() as u16) << 8;
+                let address = self.read_word_and_increment_pc();
                 let mut address2 = address + self.registers.x as u16;
                 address2 &= 0xffff;
                 self.write_memory(address2, value);
             }
             Mode::AbsoluteY => {
                 self.cycles += 4;
-                let mut address = self.read_byte_and_increment_pc() as u16;
-                address |= (self.read_byte_and_increment_pc() as u16) << 8;
+                let address = self.read_word_and_increment_pc();
                 let mut address2 = address + self.registers.y as u16;
                 address2 &= 0xffff;
                 if (address2 & 0xff00) != (address & 0xff00) {

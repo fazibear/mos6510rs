@@ -95,7 +95,7 @@ impl OpCodes {
             (Instruction::ExclusiveOrWithAccumulator, Mode::Absolute), // 0x4d
             (Instruction::LogicalShiftRight, Mode::Absolute),      // 0x4e
             (Instruction::Unknown, Mode::Unknown),                 // 0x4f
-            (Instruction::BranchIfOverflowSet, Mode::Relative),    // 0x50
+            (Instruction::BranchIfOverflowClear, Mode::Relative),  // 0x50
             (Instruction::ExclusiveOrWithAccumulator, Mode::IndirectY), // 0x51
             (Instruction::Unknown, Mode::Unknown),                 // 0x52
             (Instruction::Unknown, Mode::Unknown),                 // 0x53
@@ -103,7 +103,7 @@ impl OpCodes {
             (Instruction::ExclusiveOrWithAccumulator, Mode::ZeroPageX), // 0x55
             (Instruction::LogicalShiftRight, Mode::ZeroPageX),     // 0x56
             (Instruction::Unknown, Mode::Unknown),                 // 0x57
-            (Instruction::ClearInterrupt, Mode::Implied),   // 0x58
+            (Instruction::ClearInterrupt, Mode::Implied),          // 0x58
             (Instruction::ExclusiveOrWithAccumulator, Mode::AbsoluteY), // 0x59
             (Instruction::Unknown, Mode::Unknown),                 // 0x5a
             (Instruction::Unknown, Mode::Unknown),                 // 0x5b

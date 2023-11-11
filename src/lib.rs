@@ -1,18 +1,18 @@
 pub mod instruction;
+pub mod memory;
 pub mod mode;
 pub mod opcodes;
 pub mod registers;
-pub mod status_flags;
-pub mod memory;
 pub mod sid;
+pub mod status_flags;
 
 use instruction::Instruction;
+use memory::Memory;
 use mode::Mode;
 use opcodes::OpCodes;
 use registers::Registers;
-use status_flags::StatusFlags;
-use memory::Memory;
 use sid::Sid;
+use status_flags::StatusFlags;
 
 pub struct CPU {
     pub registers: Registers,
@@ -44,11 +44,11 @@ impl CPU {
         let program_counter = self.read_word(0xfffc);
         self.reset_to(program_counter, 0x00);
     }
-    
+
     pub fn reset_to(&mut self, program_counter: u16, accumulator: u8) {
         self.registers = Registers::new();
         self.status_flags = StatusFlags::new();
-        
+
         self.registers.accumulator = accumulator;
         self.registers.program_counter = program_counter;
     }
@@ -58,17 +58,17 @@ impl CPU {
         let address = self.read_byte_and_increment_pc();
 
         let (instruction, mode) = self.opcodes.get(address);
-                
-        // println!("x:{} y:{} a:{} s:{} f:{} pc:{} a:{}", 
-        //             self.registers.x, 
-        //             self.registers.y, 
-        //             self.registers.accumulator, 
-        //             self.registers.stack_pointer, 
-        //             self.status_flags.to_byte(), 
+
+        // println!("x:{} y:{} a:{} s:{} f:{} pc:{} a:{}",
+        //             self.registers.x,
+        //             self.registers.y,
+        //             self.registers.accumulator,
+        //             self.registers.stack_pointer,
+        //             self.status_flags.to_byte(),
         //             self.registers.program_counter,
         //             address
         // );
-        
+
         match instruction {
             Instruction::AddWithCarry => {
                 let tmp: u16 = self.registers.accumulator as u16
@@ -415,7 +415,7 @@ impl CPU {
                 self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
             }
 
-            _ => panic!("Unknown instruction: {}", instruction as u8)
+            _ => panic!("Unknown instruction: {}", instruction as u8),
         };
         self.cycles
     }
@@ -447,13 +447,13 @@ impl CPU {
             self.registers.program_counter = tmp as u16;
         }
     }
-    
+
     fn read_word(&self, address: u16) -> u16 {
         let mut val = self.read_byte(address) as u16;
-        val |= (self.read_byte(address+1) as u16) << 8;
+        val |= (self.read_byte(address + 1) as u16) << 8;
         val
     }
-    
+
     fn read_word_and_increment_pc(&mut self) -> u16 {
         let val = self.read_word(self.registers.program_counter);
         self.registers.program_counter += 2;
@@ -471,6 +471,7 @@ impl CPU {
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
+        println!("{} <- {}", address, value);
         if (address & 0xfc00) == 0xd400 {
             self.sid.write((address & 0x1f) as u8, value);
         } else {
@@ -525,14 +526,12 @@ impl CPU {
             }
             Mode::ZeroPageX => {
                 self.cycles += 4;
-                let address =
-                    self.read_byte_and_increment_pc() as u16 + self.registers.x as u16;
+                let address = self.read_byte_and_increment_pc() as u16 + self.registers.x as u16;
                 self.read_byte(address & 0xff)
             }
             Mode::ZeroPageY => {
                 self.cycles += 4;
-                let address =
-                    self.read_byte_and_increment_pc() as u16 + self.registers.y as u16;
+                let address = self.read_byte_and_increment_pc() as u16 + self.registers.y as u16;
                 self.read_byte(address & 0xff)
             }
             Mode::IndirectY => {
@@ -671,5 +670,4 @@ impl CPU {
             _ => panic!("Unimplemented put_address addressing mode!"),
         }
     }
-
 }

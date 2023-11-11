@@ -1,4 +1,3 @@
-
 pub trait Memory {
     fn read(&self, address: u16) -> u8;
     fn write(&mut self, address: u16, value: u8);
@@ -11,8 +10,7 @@ impl Memory for FakeMemory {
         0u8
     }
 
-    fn write(&mut self, _address: u16, _value: u8) {
-    }
+    fn write(&mut self, _address: u16, _value: u8) {}
 }
 
 impl FakeMemory {

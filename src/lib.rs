@@ -444,20 +444,20 @@ impl CPU {
         }
     }
 
-    fn read_word(&self, address: u16) -> u16 {
+    pub fn read_word(&self, address: u16) -> u16 {
         let mut val = self.read_byte(address) as u16;
         val |= (self.read_byte(address + 1) as u16) << 8;
         val
+    }
+    
+    pub fn read_byte(&self, address: u16) -> u8 {
+        self.memory.as_ref().read(address)
     }
 
     fn read_word_and_increment_pc(&mut self) -> u16 {
         let val = self.read_word(self.registers.program_counter);
         self.registers.program_counter += 2;
         val
-    }
-
-    fn read_byte(&self, address: u16) -> u8 {
-        self.memory.as_ref().read(address)
     }
 
     fn read_byte_and_increment_pc(&mut self) -> u8 {
@@ -591,10 +591,6 @@ impl CPU {
             }
             _ => panic!("Unimplemented set_address addressing mode!"),
         }
-    }
-
-    pub fn get_memory_at(&self, address: u16) -> u8 {
-        self.memory.as_ref().read(address)
     }
 
     fn put_address(&mut self, mode: Mode, value: u8) {

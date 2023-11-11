@@ -25,7 +25,6 @@ pub struct CPU {
 
 impl CPU {
     pub fn new(memory: Box<dyn Memory>, sid: Box<dyn Sid>) -> CPU {
-        let memory = memory;
         let cycles = 0;
         let registers = Registers::new();
         let opcodes = OpCodes::new();

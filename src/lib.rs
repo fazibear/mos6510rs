@@ -145,64 +145,40 @@ impl CPU {
                 self.status_flags.overflow = false;
             }
             Instruction::CompareWithAccumulator => {
-                let tmp = self.get_address(mode);
-                let mut tmp2 = self.registers.accumulator as i16 - tmp as i16;
-                if tmp2 < 0 {
-                    tmp2 += 256;
-                }
-
-                self.status_flags.zero = tmp2 == 0;
-                self.status_flags.negative = tmp2 & 0x80 != 0;
+                let tmp = self.registers.accumulator.wrapping_sub(self.get_address(mode));
+                self.status_flags.zero = tmp == 0;
+                self.status_flags.negative = tmp & 0x80 != 0;
                 self.status_flags.carry = self.registers.accumulator >= tmp;
             }
             Instruction::CompareWithX => {
-                let tmp = self.get_address(mode);
-                let mut tmp2 = self.registers.x as i16 - tmp as i16;
-                if tmp2 < 0 {
-                    tmp2 += 256;
-                }
-
-                self.status_flags.zero = tmp2 == 0;
-                self.status_flags.negative = tmp2 & 0x80 != 0;
+                let tmp = self.registers.x.wrapping_sub(self.get_address(mode));
+                self.status_flags.zero = tmp == 0;
+                self.status_flags.negative = tmp & 0x80 != 0;
                 self.status_flags.carry = self.registers.x >= tmp;
             }
             Instruction::CompareWithY => {
-                let tmp = self.get_address(mode);
-                let mut tmp2 = self.registers.y as i16 - tmp as i16;
-                if tmp2 < 0 {
-                    tmp2 += 256;
-                }
-
-                self.status_flags.zero = tmp2 == 0;
-                self.status_flags.negative = tmp2 & 0x80 != 0;
+                let tmp = self.registers.y.wrapping_sub(self.get_address(mode));
+                self.status_flags.zero = tmp == 0;
+                self.status_flags.negative = tmp & 0x80 != 0;
                 self.status_flags.carry = self.registers.y >= tmp;
             }
             Instruction::Decrement => {
-                let mut tmp = self.get_address(mode) as i16 - 1;
-                if tmp < 0 {
-                    tmp += 256;
-                }
-                self.set_address(mode, tmp as u8);
+                let tmp = self.get_address(mode).wrapping_sub(1);
+                self.set_address(mode, tmp);
                 self.status_flags.zero = tmp == 0;
                 self.status_flags.negative = tmp & 0x80 != 0;
             }
             Instruction::DecrementX => {
                 self.cycles += 2;
-                let mut tmp = self.registers.x as i16 - 1;
-                if tmp < 0 {
-                    tmp += 256
-                }
-                self.registers.x = tmp as u8;
+                let tmp = self.registers.x.wrapping_sub(1);
+                self.registers.x = tmp;
                 self.status_flags.zero = tmp == 0;
                 self.status_flags.negative = tmp & 0x80 != 0;
             }
             Instruction::DecrementY => {
                 self.cycles += 2;
-                let mut tmp = self.registers.y as i16 - 1;
-                if tmp < 0 {
-                    tmp += 256
-                }
-                self.registers.y = tmp as u8;
+                let tmp = self.registers.y.wrapping_sub(1);
+                self.registers.y = tmp;
                 self.status_flags.zero = tmp == 0;
                 self.status_flags.negative = tmp & 0x80 != 0;
             }
@@ -213,33 +189,22 @@ impl CPU {
                 self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
             }
             Instruction::Increment => {
-                let mut tmp = self.get_address(mode) as i16 + 1;
-                if tmp > 255 {
-                    tmp -= 256;
-                }
-                self.set_address(mode, tmp as u8);
+                let tmp = self.get_address(mode).wrapping_add(1);
+                self.set_address(mode, tmp);
                 self.status_flags.zero = tmp == 0;
                 self.status_flags.negative = tmp & 0x80 != 0;
             }
             Instruction::IncrementX => {
                 self.cycles += 2;
-                let mut tmp = self.registers.x as i16 + 1;
-                if tmp > 255 {
-                    tmp -= 256
-                }
-                tmp &= 0xff;
-                self.registers.x = tmp as u8;
+                let tmp = self.registers.x.wrapping_add(1);
+                self.registers.x = tmp;
                 self.status_flags.zero = tmp == 0;
                 self.status_flags.negative = tmp & 0x80 != 0;
             }
             Instruction::IncrementY => {
                 self.cycles += 2;
-                let mut tmp = self.registers.y as i16 + 1;
-                if tmp > 255 {
-                    tmp -= 256
-                }
-                tmp &= 0xff;
-                self.registers.y = tmp as u8;
+                let tmp = self.registers.y.wrapping_add(1);
+                self.registers.y = tmp;
                 self.status_flags.zero = tmp == 0;
                 self.status_flags.negative = tmp & 0x80 != 0;
             }
@@ -350,7 +315,7 @@ impl CPU {
                 let tmp = self.get_address(mode) as u16 ^ 0xff;
                 let tmp2 = self.registers.accumulator as u16 + tmp + self.status_flags.carry as u16;
                 self.status_flags.carry = tmp2 & 0x100 != 0;
-                self.registers.accumulator = (tmp2 & 0xff) as u8;
+                self.registers.accumulator = tmp2 as u8;
                 self.status_flags.zero = self.registers.accumulator == 0;
                 self.status_flags.negative = self.registers.accumulator > 127;
                 self.status_flags.overflow = self.status_flags.carry ^ self.status_flags.negative;
@@ -435,7 +400,6 @@ impl CPU {
         if tmp < 0 {
             tmp += 65536;
         }
-        tmp &= 0xffff;
 
         if condition {
             self.cycles +=
@@ -445,11 +409,9 @@ impl CPU {
     }
 
     pub fn read_word(&self, address: u16) -> u16 {
-        let mut val = self.read_byte(address) as u16;
-        val |= (self.read_byte(address + 1) as u16) << 8;
-        val
+        self.read_byte(address) as u16 | (self.read_byte(address + 1) as u16) << 8
     }
-    
+
     pub fn read_byte(&self, address: u16) -> u8 {
         self.memory.as_ref().read(address)
     }
@@ -491,14 +453,12 @@ impl CPU {
             }
             Mode::Absolute => {
                 self.cycles += 4;
-                let address = self.read_byte_and_increment_pc() as u16
-                    | ((self.read_byte_and_increment_pc() as u16) << 8);
+                let address = self.read_word_and_increment_pc();
                 self.read_byte(address)
             }
             Mode::AbsoluteX => {
                 self.cycles += 4;
-                let address = self.read_byte_and_increment_pc() as u16
-                    | (self.read_byte_and_increment_pc() as u16) << 8;
+                let address = self.read_word_and_increment_pc();
                 let address2 = address + self.registers.x as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
@@ -507,8 +467,7 @@ impl CPU {
             }
             Mode::AbsoluteY => {
                 self.cycles += 4;
-                let address = self.read_byte_and_increment_pc() as u16
-                    | (self.read_byte_and_increment_pc() as u16) << 8;
+                let address = self.read_word_and_increment_pc();
                 let address2 = address + self.registers.y as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
@@ -533,8 +492,7 @@ impl CPU {
             Mode::IndirectY => {
                 self.cycles += 5;
                 let mut address = self.read_byte_and_increment_pc() as u16;
-                let address2 = (self.read_byte(address) as u16)
-                    | ((self.read_byte((address + 1) & 0xff) as u16) << 8u8);
+                let address2 = self.read_word(address);
                 address = address2 + self.registers.y as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
@@ -543,11 +501,10 @@ impl CPU {
             }
             Mode::XIndirect => {
                 self.cycles += 6;
+
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 address += self.registers.x as u16;
-                let mut address2 = self.read_byte(address & 0xff) as u16;
-                address += 1;
-                address2 |= (self.read_byte(address & 0xff) as u16) << 8;
+                let address2 = self.read_word(address & 0xff);
                 self.read_byte(address2)
             }
             Mode::Accumulator => {
@@ -568,8 +525,7 @@ impl CPU {
             Mode::AbsoluteX => {
                 self.cycles += 3;
                 let address = self.read_word(self.registers.program_counter - 2);
-                let mut address2 = address + self.registers.x as u16;
-                address2 &= 0xffff;
+                let address2 = address + self.registers.x as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles -= 1;
                 }
@@ -603,15 +559,13 @@ impl CPU {
             Mode::AbsoluteX => {
                 self.cycles += 4;
                 let address = self.read_word_and_increment_pc();
-                let mut address2 = address + self.registers.x as u16;
-                address2 &= 0xffff;
+                let address2 = address + self.registers.x as u16;
                 self.write_memory(address2, value);
             }
             Mode::AbsoluteY => {
                 self.cycles += 4;
                 let address = self.read_word_and_increment_pc();
-                let mut address2 = address + self.registers.y as u16;
-                address2 &= 0xffff;
+                let address2 = address + self.registers.y as u16;
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
                 };
@@ -638,16 +592,13 @@ impl CPU {
                 self.cycles += 6;
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 address += self.registers.x as u16;
-                let mut address2 = self.read_byte(address & 0xff) as u16;
-                address += 1;
-                address2 |= (self.read_byte(address & 0xff) as u16) << 8;
+                let address2 = self.read_word(address & 0xff);
                 self.write_memory(address2, value);
             }
             Mode::IndirectY => {
                 self.cycles += 5;
                 let mut address = self.read_byte_and_increment_pc() as u16;
-                let mut address2 = self.read_byte(address) as u16;
-                address2 |= (self.read_byte((address + 1) & 0xff) as u16) << 8;
+                let address2 = self.read_word(address);
                 address = address2 + self.registers.y as u16;
                 self.write_memory(address, value);
             }

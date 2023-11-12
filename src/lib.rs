@@ -52,22 +52,33 @@ impl CPU {
         self.registers.accumulator = accumulator;
         self.registers.program_counter = program_counter;
     }
-
+    
     pub fn step(&mut self) -> u64 {
+        self._step(false)
+    }
+    
+    pub fn step_with_debug(&mut self) -> u64 {
+        self._step(true)
+    }
+
+    fn _step(&mut self, debug: bool) -> u64 {
         self.cycles = 0;
         let address = self.read_byte_and_increment_pc();
 
         let (instruction, mode) = self.opcodes.get(address);
 
-        // println!("x:{} y:{} a:{} s:{} f:{} pc:{} a:{}",
-        //             self.registers.x,
-        //             self.registers.y,
-        //             self.registers.accumulator,
-        //             self.registers.stack_pointer,
-        //             self.status_flags.to_byte(),
-        //             self.registers.program_counter,
-        //             address
-        // );
+        if debug {
+            println!(
+                "x:{} y:{} a:{} s:{} f:{} pc:{} a:{}",
+                self.registers.x,
+                self.registers.y,
+                self.registers.accumulator,
+                self.registers.stack_pointer,
+                self.status_flags.to_byte(),
+                self.registers.program_counter,
+                address
+            );
+        }
 
         match instruction {
             Instruction::AddWithCarry => {
@@ -145,7 +156,10 @@ impl CPU {
                 self.status_flags.overflow = false;
             }
             Instruction::CompareWithAccumulator => {
-                let tmp = self.registers.accumulator.wrapping_sub(self.get_address(mode));
+                let tmp = self
+                    .registers
+                    .accumulator
+                    .wrapping_sub(self.get_address(mode));
                 self.status_flags.zero = tmp == 0;
                 self.status_flags.negative = tmp & 0x80 != 0;
                 self.status_flags.carry = self.registers.accumulator >= tmp;
@@ -416,13 +430,13 @@ impl CPU {
         self.memory.as_ref().read(address)
     }
 
-    fn read_word_and_increment_pc(&mut self) -> u16 {
+    pub fn read_word_and_increment_pc(&mut self) -> u16 {
         let val = self.read_word(self.registers.program_counter);
         self.registers.program_counter += 2;
         val
     }
 
-    fn read_byte_and_increment_pc(&mut self) -> u8 {
+    pub fn read_byte_and_increment_pc(&mut self) -> u8 {
         let mem = self.read_byte(self.registers.program_counter);
         self.increment_pc();
         mem

@@ -21,15 +21,15 @@ pub struct CPU {
     pub sid: Box<dyn Sid>,
     pub cycles: u64,
     pub opcodes: OpCodes,
+    pub debug: bool,
 }
 
 impl CPU {
-    pub fn new(memory: Box<dyn Memory>, sid: Box<dyn Sid>) -> CPU {
+    pub fn new(memory: Box<dyn Memory>, sid: Box<dyn Sid>, debug: bool) -> CPU {
         let cycles = 0;
         let registers = Registers::new();
         let opcodes = OpCodes::new();
         let status_flags = StatusFlags::new();
-
         CPU {
             registers,
             memory,
@@ -37,6 +37,7 @@ impl CPU {
             opcodes,
             status_flags,
             sid,
+            debug,
         }
     }
 
@@ -52,22 +53,14 @@ impl CPU {
         self.registers.accumulator = accumulator;
         self.registers.program_counter = program_counter;
     }
-    
-    pub fn step(&mut self) -> u64 {
-        self._step(false)
-    }
-    
-    pub fn step_with_debug(&mut self) -> u64 {
-        self._step(true)
-    }
 
-    fn _step(&mut self, debug: bool) -> u64 {
+    pub fn step(&mut self) -> u64 {
         self.cycles = 0;
         let address = self.read_byte_and_increment_pc();
 
         let (instruction, mode) = self.opcodes.get(address);
 
-        if debug {
+        if self.debug {
             println!(
                 "x:{} y:{} a:{} s:{} f:{} pc:{} a:{}",
                 self.registers.x,
@@ -443,7 +436,9 @@ impl CPU {
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
-        //println!("{} <- {}", address, value);
+        if self.debug {
+            println!("{} <- {}", address, value);
+        }
         if (address & 0xfc00) == 0xd400 {
             self.sid.write((address & 0x1f) as u8, value);
         } else {

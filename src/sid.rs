@@ -18,3 +18,9 @@ impl FakeSid {
         FakeSid()
     }
 }
+
+impl Default for FakeSid {
+    fn default() -> Self {
+        Self::new()
+    }
+}

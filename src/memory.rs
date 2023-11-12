@@ -13,6 +13,12 @@ impl Memory for FakeMemory {
     fn write(&mut self, _address: u16, _value: u8) {}
 }
 
+impl Default for FakeMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeMemory {
     pub fn new() -> FakeMemory {
         FakeMemory()

@@ -19,21 +19,27 @@ pub struct CPU {
     pub status_flags: StatusFlags,
     pub memory: Rc<RefCell<dyn Memory>>,
     pub cycles: u64,
-    pub debug: bool,
+    pub step_callback: Option<Box<dyn Fn(&CPU)>>,
 }
 
 impl CPU {
-    pub fn new(memory: Rc<RefCell<dyn Memory>>, debug: bool) -> CPU {
+    pub fn new(memory: Rc<RefCell<dyn Memory>>) -> CPU {
         let cycles = 0;
         let registers = Registers::new();
         let status_flags = StatusFlags::new();
+        let step_callback = None;
+
         CPU {
             registers,
             memory,
             cycles,
             status_flags,
-            debug,
+            step_callback,
         }
+    }
+
+    pub fn set_step_callback(&mut self, fun: Box<dyn Fn(&CPU)>) {
+        self.step_callback = Some(fun);
     }
 
     pub fn reset(&mut self) {
@@ -53,17 +59,8 @@ impl CPU {
         self.cycles = 0;
         let opcode = self.read_byte_and_increment_pc();
 
-        if self.debug {
-            println!(
-                "x:{} y:{} a:{} s:{} f:{} pc:{} op:{}",
-                self.registers.x,
-                self.registers.y,
-                self.registers.accumulator,
-                self.registers.stack_pointer,
-                self.status_flags.to_byte(),
-                self.registers.program_counter,
-                opcode
-            );
+        if let Some(ref step_callback) = self.step_callback {
+            step_callback(self)
         }
 
         if let Some((instruction, mode)) = opcodes::get(opcode) {

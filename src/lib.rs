@@ -11,6 +11,7 @@ use std::rc::Rc;
 use instruction::Instruction;
 use memory::Memory;
 use mode::Mode;
+use opcodes::OpCode;
 use registers::Registers;
 use status_flags::StatusFlags;
 
@@ -19,6 +20,7 @@ pub struct CPU {
     pub status_flags: StatusFlags,
     pub memory: Rc<RefCell<dyn Memory>>,
     pub cycles: u64,
+    pub current_opcode: OpCode,
     pub step_callback: Option<Box<dyn Fn(&CPU)>>,
 }
 
@@ -27,6 +29,7 @@ impl CPU {
         let cycles = 0;
         let registers = Registers::new();
         let status_flags = StatusFlags::new();
+        let current_opcode = None;
         let step_callback = None;
 
         CPU {
@@ -34,6 +37,7 @@ impl CPU {
             memory,
             cycles,
             status_flags,
+            current_opcode,
             step_callback,
         }
     }
@@ -58,12 +62,13 @@ impl CPU {
     pub fn step(&mut self) -> u64 {
         self.cycles = 0;
         let opcode = self.read_byte_and_increment_pc();
+        self.current_opcode = opcodes::get(opcode);
 
         if let Some(ref step_callback) = self.step_callback {
             step_callback(self)
         }
 
-        if let Some((instruction, mode)) = opcodes::get(opcode) {
+        if let Some((instruction, mode)) = self.current_opcode {
             match instruction {
                 Instruction::AddWithCarry => {
                     let tmp: u16 = self.registers.accumulator as u16

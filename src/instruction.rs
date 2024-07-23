@@ -56,5 +56,4 @@ pub enum Instruction {
     TransferXToAccumulator,     //TXA transfer X to accumulator
     TransferXToStackPointer,    //TXS transfer X to stack pointer
     TransferYToAccumulator,     //TYA transfer Y to accumulator
-    Unknown,
 }

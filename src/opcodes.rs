@@ -1,280 +1,267 @@
 use crate::instruction::Instruction;
 use crate::mode::Mode;
 
-pub type OpCode = (Instruction, Mode);
+pub type OpCode = Option<(Instruction, Mode)>;
 
-#[derive(Debug)]
-pub struct OpCodes([OpCode; 256]);
+static OP_CODES: [OpCode; 256] = [
+    Some((Instruction::Break, Mode::Implied)),
+    Some((Instruction::OrWithAccumulator, Mode::XIndirect)),
+    None,
+    None,
+    None,
+    Some((Instruction::OrWithAccumulator, Mode::ZeroPage)),
+    Some((Instruction::ArithmeticShiftLeft, Mode::ZeroPage)),
+    None,
+    Some((Instruction::PushProcessorStatus, Mode::Implied)),
+    Some((Instruction::OrWithAccumulator, Mode::Immediate)),
+    Some((Instruction::ArithmeticShiftLeft, Mode::Accumulator)),
+    None,
+    None,
+    Some((Instruction::OrWithAccumulator, Mode::Absolute)),
+    Some((Instruction::ArithmeticShiftLeft, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfPlus, Mode::Relative)),
+    Some((Instruction::OrWithAccumulator, Mode::IndirectY)),
+    None,
+    None,
+    None,
+    Some((Instruction::OrWithAccumulator, Mode::ZeroPageX)),
+    Some((Instruction::ArithmeticShiftLeft, Mode::ZeroPageX)),
+    None,
+    Some((Instruction::ClearCarry, Mode::Implied)),
+    Some((Instruction::OrWithAccumulator, Mode::AbsoluteY)),
+    None,
+    None,
+    None,
+    Some((Instruction::OrWithAccumulator, Mode::AbsoluteX)),
+    Some((Instruction::ArithmeticShiftLeft, Mode::AbsoluteX)),
+    None,
+    Some((Instruction::JumpSubroutine, Mode::Absolute)),
+    Some((Instruction::AndWithAccumulator, Mode::XIndirect)),
+    None,
+    None,
+    Some((Instruction::BitSet, Mode::ZeroPage)),
+    Some((Instruction::AndWithAccumulator, Mode::ZeroPage)),
+    Some((Instruction::RotateLeft, Mode::ZeroPage)),
+    None,
+    Some((Instruction::PullProcessorStatus, Mode::Implied)),
+    Some((Instruction::AndWithAccumulator, Mode::Immediate)),
+    Some((Instruction::RotateLeft, Mode::Accumulator)),
+    None,
+    Some((Instruction::BitSet, Mode::Absolute)),
+    Some((Instruction::AndWithAccumulator, Mode::Absolute)),
+    Some((Instruction::RotateLeft, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfMinus, Mode::Relative)),
+    Some((Instruction::AndWithAccumulator, Mode::IndirectY)),
+    None,
+    None,
+    None,
+    Some((Instruction::AndWithAccumulator, Mode::ZeroPageX)),
+    Some((Instruction::RotateLeft, Mode::ZeroPageX)),
+    None,
+    Some((Instruction::SetCarry, Mode::Implied)),
+    Some((Instruction::AndWithAccumulator, Mode::AbsoluteY)),
+    None,
+    None,
+    None,
+    Some((Instruction::AndWithAccumulator, Mode::AbsoluteX)),
+    Some((Instruction::RotateLeft, Mode::AbsoluteX)),
+    None,
+    Some((Instruction::ReturnFromInterrupt, Mode::Implied)),
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::XIndirect)),
+    None,
+    None,
+    None,
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::ZeroPage)),
+    Some((Instruction::LogicalShiftRight, Mode::ZeroPage)),
+    None,
+    Some((Instruction::PushAccumulator, Mode::Implied)),
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::Immediate)),
+    Some((Instruction::LogicalShiftRight, Mode::Accumulator)),
+    None,
+    Some((Instruction::Jump, Mode::Absolute)),
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::Absolute)),
+    Some((Instruction::LogicalShiftRight, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfOverflowClear, Mode::Relative)),
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::IndirectY)),
+    None,
+    None,
+    None,
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::ZeroPageX)),
+    Some((Instruction::LogicalShiftRight, Mode::ZeroPageX)),
+    None,
+    Some((Instruction::ClearInterrupt, Mode::Implied)),
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::AbsoluteY)),
+    None,
+    None,
+    None,
+    Some((Instruction::ExclusiveOrWithAccumulator, Mode::AbsoluteX)),
+    Some((Instruction::LogicalShiftRight, Mode::AbsoluteX)),
+    None,
+    Some((Instruction::ReturnFromSubroutine, Mode::Implied)),
+    Some((Instruction::AddWithCarry, Mode::XIndirect)),
+    None,
+    None,
+    None,
+    Some((Instruction::AddWithCarry, Mode::ZeroPage)),
+    Some((Instruction::RotateRight, Mode::ZeroPage)),
+    None,
+    Some((Instruction::PullAccumulator, Mode::Implied)),
+    Some((Instruction::AddWithCarry, Mode::Immediate)),
+    Some((Instruction::RotateRight, Mode::Accumulator)),
+    None,
+    Some((Instruction::Jump, Mode::Indirect)),
+    Some((Instruction::AddWithCarry, Mode::Absolute)),
+    Some((Instruction::RotateRight, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfOverflowSet, Mode::Relative)),
+    Some((Instruction::AddWithCarry, Mode::IndirectY)),
+    None,
+    None,
+    None,
+    Some((Instruction::AddWithCarry, Mode::ZeroPageX)),
+    Some((Instruction::RotateRight, Mode::ZeroPageX)),
+    None,
+    Some((Instruction::SetInterruptDisable, Mode::Implied)),
+    Some((Instruction::AddWithCarry, Mode::AbsoluteY)),
+    None,
+    None,
+    None,
+    Some((Instruction::AddWithCarry, Mode::AbsoluteX)),
+    Some((Instruction::RotateRight, Mode::AbsoluteX)),
+    None,
+    None,
+    Some((Instruction::StoreAccumulator, Mode::XIndirect)),
+    None,
+    None,
+    Some((Instruction::StoreY, Mode::ZeroPage)),
+    Some((Instruction::StoreAccumulator, Mode::ZeroPage)),
+    Some((Instruction::StoreX, Mode::ZeroPage)),
+    None,
+    Some((Instruction::DecrementY, Mode::Implied)),
+    None,
+    Some((Instruction::TransferXToAccumulator, Mode::Accumulator)),
+    None,
+    Some((Instruction::StoreY, Mode::Absolute)),
+    Some((Instruction::StoreAccumulator, Mode::Absolute)),
+    Some((Instruction::StoreX, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfCarryClear, Mode::Relative)),
+    Some((Instruction::StoreAccumulator, Mode::IndirectY)),
+    None,
+    None,
+    Some((Instruction::StoreY, Mode::ZeroPageX)),
+    Some((Instruction::StoreAccumulator, Mode::ZeroPageX)),
+    Some((Instruction::StoreX, Mode::ZeroPageY)),
+    None,
+    Some((Instruction::TransferYToAccumulator, Mode::Implied)),
+    Some((Instruction::StoreAccumulator, Mode::AbsoluteY)),
+    Some((Instruction::TransferXToStackPointer, Mode::Accumulator)),
+    None,
+    None,
+    Some((Instruction::StoreAccumulator, Mode::AbsoluteX)),
+    None,
+    None,
+    Some((Instruction::LoadY, Mode::Immediate)),
+    Some((Instruction::LoadAccumulator, Mode::XIndirect)),
+    Some((Instruction::LoadX, Mode::Immediate)),
+    None,
+    Some((Instruction::LoadY, Mode::ZeroPage)),
+    Some((Instruction::LoadAccumulator, Mode::ZeroPage)),
+    Some((Instruction::LoadX, Mode::ZeroPage)),
+    None,
+    Some((Instruction::TransferAccumulatorToY, Mode::Implied)),
+    Some((Instruction::LoadAccumulator, Mode::Immediate)),
+    Some((Instruction::TransferAccumulatorToX, Mode::Accumulator)),
+    None,
+    Some((Instruction::LoadY, Mode::Absolute)),
+    Some((Instruction::LoadAccumulator, Mode::Absolute)),
+    Some((Instruction::LoadX, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfCarrySet, Mode::Relative)),
+    Some((Instruction::LoadAccumulator, Mode::IndirectY)),
+    None,
+    None,
+    Some((Instruction::LoadY, Mode::ZeroPageX)),
+    Some((Instruction::LoadAccumulator, Mode::ZeroPageX)),
+    Some((Instruction::LoadX, Mode::ZeroPageY)),
+    None,
+    Some((Instruction::ClearOverflow, Mode::Implied)),
+    Some((Instruction::LoadAccumulator, Mode::AbsoluteY)),
+    Some((Instruction::TransferStackPointerToX, Mode::Accumulator)),
+    None,
+    Some((Instruction::LoadY, Mode::AbsoluteX)),
+    Some((Instruction::LoadAccumulator, Mode::AbsoluteX)),
+    Some((Instruction::LoadX, Mode::AbsoluteY)),
+    None,
+    Some((Instruction::CompareWithY, Mode::Immediate)),
+    Some((Instruction::CompareWithAccumulator, Mode::XIndirect)),
+    None,
+    None,
+    Some((Instruction::CompareWithY, Mode::ZeroPage)),
+    Some((Instruction::CompareWithAccumulator, Mode::ZeroPage)),
+    Some((Instruction::Decrement, Mode::ZeroPage)),
+    None,
+    Some((Instruction::IncrementY, Mode::Implied)),
+    Some((Instruction::CompareWithAccumulator, Mode::Immediate)),
+    Some((Instruction::DecrementX, Mode::Accumulator)),
+    None,
+    Some((Instruction::CompareWithY, Mode::Absolute)),
+    Some((Instruction::CompareWithAccumulator, Mode::Absolute)),
+    Some((Instruction::Decrement, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfNotEqual, Mode::Relative)),
+    Some((Instruction::CompareWithAccumulator, Mode::IndirectY)),
+    None,
+    None,
+    None,
+    Some((Instruction::CompareWithAccumulator, Mode::ZeroPageX)),
+    Some((Instruction::Decrement, Mode::ZeroPageX)),
+    None,
+    Some((Instruction::ClearDecimal, Mode::Implied)),
+    Some((Instruction::CompareWithAccumulator, Mode::AbsoluteY)),
+    None,
+    None,
+    None,
+    Some((Instruction::CompareWithAccumulator, Mode::AbsoluteX)),
+    Some((Instruction::Decrement, Mode::AbsoluteX)),
+    None,
+    Some((Instruction::CompareWithX, Mode::Immediate)),
+    Some((Instruction::SubtractWithCarry, Mode::XIndirect)),
+    None,
+    None,
+    Some((Instruction::CompareWithX, Mode::ZeroPage)),
+    Some((Instruction::SubtractWithCarry, Mode::ZeroPage)),
+    Some((Instruction::Increment, Mode::ZeroPage)),
+    None,
+    Some((Instruction::IncrementX, Mode::Implied)),
+    Some((Instruction::SubtractWithCarry, Mode::Immediate)),
+    Some((Instruction::NoOperation, Mode::Accumulator)),
+    None,
+    Some((Instruction::CompareWithX, Mode::Absolute)),
+    Some((Instruction::SubtractWithCarry, Mode::Absolute)),
+    Some((Instruction::Increment, Mode::Absolute)),
+    None,
+    Some((Instruction::BranchIfEqual, Mode::Relative)),
+    Some((Instruction::SubtractWithCarry, Mode::IndirectY)),
+    None,
+    None,
+    None,
+    Some((Instruction::SubtractWithCarry, Mode::ZeroPageX)),
+    Some((Instruction::Increment, Mode::ZeroPageX)),
+    None,
+    Some((Instruction::SetDecimal, Mode::Implied)),
+    Some((Instruction::SubtractWithCarry, Mode::AbsoluteY)),
+    None,
+    None,
+    None,
+    Some((Instruction::SubtractWithCarry, Mode::AbsoluteX)),
+    Some((Instruction::Increment, Mode::AbsoluteX)),
+    None,
+];
 
-impl Default for OpCodes {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl OpCodes {
-    pub fn new() -> Self {
-        Self([
-            (Instruction::Break, Mode::Implied),                   // 0x00
-            (Instruction::OrWithAccumulator, Mode::XIndirect),     // 0x01
-            (Instruction::Unknown, Mode::Unknown),                 // 0x02
-            (Instruction::Unknown, Mode::Unknown),                 // 0x03
-            (Instruction::Unknown, Mode::ZeroPage),                // 0x04
-            (Instruction::OrWithAccumulator, Mode::ZeroPage),      // 0x05
-            (Instruction::ArithmeticShiftLeft, Mode::ZeroPage),    // 0x06
-            (Instruction::Unknown, Mode::Unknown),                 // 0x07
-            (Instruction::PushProcessorStatus, Mode::Implied),     // 0x08
-            (Instruction::OrWithAccumulator, Mode::Immediate),     // 0x09
-            (Instruction::ArithmeticShiftLeft, Mode::Accumulator), // 0x0a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x0b
-            (Instruction::Unknown, Mode::Absolute),                // 0x0c
-            (Instruction::OrWithAccumulator, Mode::Absolute),      // 0x0d
-            (Instruction::ArithmeticShiftLeft, Mode::Absolute),    // 0x0e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x0f
-            (Instruction::BranchIfPlus, Mode::Relative),           // 0x10
-            (Instruction::OrWithAccumulator, Mode::IndirectY),     // 0x11
-            (Instruction::Unknown, Mode::Unknown),                 // 0x12
-            (Instruction::Unknown, Mode::Unknown),                 // 0x13
-            (Instruction::Unknown, Mode::Unknown),                 // 0x14
-            (Instruction::OrWithAccumulator, Mode::ZeroPageX),     // 0x15
-            (Instruction::ArithmeticShiftLeft, Mode::ZeroPageX),   // 0x16
-            (Instruction::Unknown, Mode::Unknown),                 // 0x17
-            (Instruction::ClearCarry, Mode::Implied),              // 0x18
-            (Instruction::OrWithAccumulator, Mode::AbsoluteY),     // 0x19
-            (Instruction::Unknown, Mode::Unknown),                 // 0x1a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x1b
-            (Instruction::Unknown, Mode::Unknown),                 // 0x1c
-            (Instruction::OrWithAccumulator, Mode::AbsoluteX),     // 0x1d
-            (Instruction::ArithmeticShiftLeft, Mode::AbsoluteX),   // 0x1e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x1f
-            (Instruction::JumpSubroutine, Mode::Absolute),         // 0x20
-            (Instruction::AndWithAccumulator, Mode::XIndirect),    // 0x21
-            (Instruction::Unknown, Mode::Unknown),                 // 0x22
-            (Instruction::Unknown, Mode::Unknown),                 // 0x23
-            (Instruction::BitSet, Mode::ZeroPage),                 // 0x24
-            (Instruction::AndWithAccumulator, Mode::ZeroPage),     // 0x25
-            (Instruction::RotateLeft, Mode::ZeroPage),             // 0x26
-            (Instruction::Unknown, Mode::Unknown),                 // 0x27
-            (Instruction::PullProcessorStatus, Mode::Implied),     // 0x28
-            (Instruction::AndWithAccumulator, Mode::Immediate),    // 0x29
-            (Instruction::RotateLeft, Mode::Accumulator),          // 0x2a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x2b
-            (Instruction::BitSet, Mode::Absolute),                 // 0x2c
-            (Instruction::AndWithAccumulator, Mode::Absolute),     // 0x2d
-            (Instruction::RotateLeft, Mode::Absolute),             // 0x2e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x2f
-            (Instruction::BranchIfMinus, Mode::Relative),          // 0x30
-            (Instruction::AndWithAccumulator, Mode::IndirectY),    // 0x31
-            (Instruction::Unknown, Mode::Unknown),                 // 0x32
-            (Instruction::Unknown, Mode::Unknown),                 // 0x33
-            (Instruction::Unknown, Mode::Unknown),                 // 0x34
-            (Instruction::AndWithAccumulator, Mode::ZeroPageX),    // 0x35
-            (Instruction::RotateLeft, Mode::ZeroPageX),            // 0x36
-            (Instruction::Unknown, Mode::Unknown),                 // 0x37
-            (Instruction::SetCarry, Mode::Implied),                // 0x38
-            (Instruction::AndWithAccumulator, Mode::AbsoluteY),    // 0x39
-            (Instruction::Unknown, Mode::Unknown),                 // 0x3a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x3b
-            (Instruction::Unknown, Mode::Unknown),                 // 0x3c
-            (Instruction::AndWithAccumulator, Mode::AbsoluteX),    // 0x3d
-            (Instruction::RotateLeft, Mode::AbsoluteX),            // 0x3e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x3f
-            (Instruction::ReturnFromInterrupt, Mode::Implied),     // 0x40
-            (Instruction::ExclusiveOrWithAccumulator, Mode::XIndirect), // 0x41
-            (Instruction::Unknown, Mode::Unknown),                 // 0x42
-            (Instruction::Unknown, Mode::Unknown),                 // 0x43
-            (Instruction::Unknown, Mode::ZeroPage),                // 0x44
-            (Instruction::ExclusiveOrWithAccumulator, Mode::ZeroPage), // 0x45
-            (Instruction::LogicalShiftRight, Mode::ZeroPage),      // 0x46
-            (Instruction::Unknown, Mode::Unknown),                 // 0x47
-            (Instruction::PushAccumulator, Mode::Implied),         // 0x48
-            (Instruction::ExclusiveOrWithAccumulator, Mode::Immediate), // 0x49
-            (Instruction::LogicalShiftRight, Mode::Accumulator),   // 0x4a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x4b
-            (Instruction::Jump, Mode::Absolute),                   // 0x4c
-            (Instruction::ExclusiveOrWithAccumulator, Mode::Absolute), // 0x4d
-            (Instruction::LogicalShiftRight, Mode::Absolute),      // 0x4e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x4f
-            (Instruction::BranchIfOverflowClear, Mode::Relative),  // 0x50
-            (Instruction::ExclusiveOrWithAccumulator, Mode::IndirectY), // 0x51
-            (Instruction::Unknown, Mode::Unknown),                 // 0x52
-            (Instruction::Unknown, Mode::Unknown),                 // 0x53
-            (Instruction::Unknown, Mode::Unknown),                 // 0x54
-            (Instruction::ExclusiveOrWithAccumulator, Mode::ZeroPageX), // 0x55
-            (Instruction::LogicalShiftRight, Mode::ZeroPageX),     // 0x56
-            (Instruction::Unknown, Mode::Unknown),                 // 0x57
-            (Instruction::ClearInterrupt, Mode::Implied),          // 0x58
-            (Instruction::ExclusiveOrWithAccumulator, Mode::AbsoluteY), // 0x59
-            (Instruction::Unknown, Mode::Unknown),                 // 0x5a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x5b
-            (Instruction::Unknown, Mode::Unknown),                 // 0x5c
-            (Instruction::ExclusiveOrWithAccumulator, Mode::AbsoluteX), // 0x5d
-            (Instruction::LogicalShiftRight, Mode::AbsoluteX),     // 0x5e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x5f
-            (Instruction::ReturnFromSubroutine, Mode::Implied),    // 0x60
-            (Instruction::AddWithCarry, Mode::XIndirect),          // 0x61
-            (Instruction::Unknown, Mode::Unknown),                 // 0x62
-            (Instruction::Unknown, Mode::Unknown),                 // 0x63
-            (Instruction::Unknown, Mode::ZeroPage),                // 0x64
-            (Instruction::AddWithCarry, Mode::ZeroPage),           // 0x65
-            (Instruction::RotateRight, Mode::ZeroPage),            // 0x66
-            (Instruction::Unknown, Mode::Unknown),                 // 0x67
-            (Instruction::PullAccumulator, Mode::Implied),         // 0x68
-            (Instruction::AddWithCarry, Mode::Immediate),          // 0x69
-            (Instruction::RotateRight, Mode::Accumulator),         // 0x6a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x6b
-            (Instruction::Jump, Mode::Indirect),                   // 0x6c
-            (Instruction::AddWithCarry, Mode::Absolute),           // 0x6d
-            (Instruction::RotateRight, Mode::Absolute),            // 0x6e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x6f
-            (Instruction::BranchIfOverflowSet, Mode::Relative),    // 0x70
-            (Instruction::AddWithCarry, Mode::IndirectY),          // 0x71
-            (Instruction::Unknown, Mode::Unknown),                 // 0x72
-            (Instruction::Unknown, Mode::Unknown),                 // 0x73
-            (Instruction::Unknown, Mode::Unknown),                 // 0x74
-            (Instruction::AddWithCarry, Mode::ZeroPageX),          // 0x75
-            (Instruction::RotateRight, Mode::ZeroPageX),           // 0x76
-            (Instruction::Unknown, Mode::Unknown),                 // 0x77
-            (Instruction::SetInterruptDisable, Mode::Implied),     // 0x78
-            (Instruction::AddWithCarry, Mode::AbsoluteY),          // 0x79
-            (Instruction::Unknown, Mode::Unknown),                 // 0x7a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x7b
-            (Instruction::Unknown, Mode::Unknown),                 // 0x7c
-            (Instruction::AddWithCarry, Mode::AbsoluteX),          // 0x7d
-            (Instruction::RotateRight, Mode::AbsoluteX),           // 0x7e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x7f
-            (Instruction::Unknown, Mode::Immediate),               // 0x80
-            (Instruction::StoreAccumulator, Mode::XIndirect),      // 0x81
-            (Instruction::Unknown, Mode::Unknown),                 // 0x82
-            (Instruction::Unknown, Mode::Unknown),                 // 0x83
-            (Instruction::StoreY, Mode::ZeroPage),                 // 0x84
-            (Instruction::StoreAccumulator, Mode::ZeroPage),       // 0x85
-            (Instruction::StoreX, Mode::ZeroPage),                 // 0x86
-            (Instruction::Unknown, Mode::Unknown),                 // 0x87
-            (Instruction::DecrementY, Mode::Implied),              // 0x88
-            (Instruction::Unknown, Mode::Immediate),               // 0x89
-            (Instruction::TransferXToAccumulator, Mode::Accumulator), // 0x8a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x8b
-            (Instruction::StoreY, Mode::Absolute),                 // 0x8c
-            (Instruction::StoreAccumulator, Mode::Absolute),       // 0x8d
-            (Instruction::StoreX, Mode::Absolute),                 // 0x8e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x8f
-            (Instruction::BranchIfCarryClear, Mode::Relative),     // 0x90
-            (Instruction::StoreAccumulator, Mode::IndirectY),      // 0x91
-            (Instruction::Unknown, Mode::Unknown),                 // 0x92
-            (Instruction::Unknown, Mode::Unknown),                 // 0x93
-            (Instruction::StoreY, Mode::ZeroPageX),                // 0x94
-            (Instruction::StoreAccumulator, Mode::ZeroPageX),      // 0x95
-            (Instruction::StoreX, Mode::ZeroPageY),                // 0x96
-            (Instruction::Unknown, Mode::Unknown),                 // 0x97
-            (Instruction::TransferYToAccumulator, Mode::Implied),  // 0x98
-            (Instruction::StoreAccumulator, Mode::AbsoluteY),      // 0x99
-            (Instruction::TransferXToStackPointer, Mode::Accumulator), // 0x9a
-            (Instruction::Unknown, Mode::Unknown),                 // 0x9b
-            (Instruction::Unknown, Mode::Unknown),                 // 0x9c
-            (Instruction::StoreAccumulator, Mode::AbsoluteX),      // 0x9d
-            (Instruction::Unknown, Mode::AbsoluteX),               // 0x9e
-            (Instruction::Unknown, Mode::Unknown),                 // 0x9f
-            (Instruction::LoadY, Mode::Immediate),                 // 0xa0
-            (Instruction::LoadAccumulator, Mode::XIndirect),       // 0xa1
-            (Instruction::LoadX, Mode::Immediate),                 // 0xa2
-            (Instruction::Unknown, Mode::Unknown),                 // 0xa3
-            (Instruction::LoadY, Mode::ZeroPage),                  // 0xa4
-            (Instruction::LoadAccumulator, Mode::ZeroPage),        // 0xa5
-            (Instruction::LoadX, Mode::ZeroPage),                  // 0xa6
-            (Instruction::Unknown, Mode::Unknown),                 // 0xa7
-            (Instruction::TransferAccumulatorToY, Mode::Implied),  // 0xa8
-            (Instruction::LoadAccumulator, Mode::Immediate),       // 0xa9
-            (Instruction::TransferAccumulatorToX, Mode::Accumulator), // 0xaa
-            (Instruction::Unknown, Mode::Unknown),                 // 0xab
-            (Instruction::LoadY, Mode::Absolute),                  // 0xac
-            (Instruction::LoadAccumulator, Mode::Absolute),        // 0xad
-            (Instruction::LoadX, Mode::Absolute),                  // 0xae
-            (Instruction::Unknown, Mode::Unknown),                 // 0xaf
-            (Instruction::BranchIfCarrySet, Mode::Relative),       // 0xb0
-            (Instruction::LoadAccumulator, Mode::IndirectY),       // 0xb1
-            (Instruction::Unknown, Mode::Unknown),                 // 0xb2
-            (Instruction::Unknown, Mode::Unknown),                 // 0xb3
-            (Instruction::LoadY, Mode::ZeroPageX),                 // 0xb4
-            (Instruction::LoadAccumulator, Mode::ZeroPageX),       // 0xb5
-            (Instruction::LoadX, Mode::ZeroPageY),                 // 0xb6
-            (Instruction::Unknown, Mode::Unknown),                 // 0xb7
-            (Instruction::ClearOverflow, Mode::Implied),           // 0xb8
-            (Instruction::LoadAccumulator, Mode::AbsoluteY),       // 0xb9
-            (Instruction::TransferStackPointerToX, Mode::Accumulator), // 0xba
-            (Instruction::Unknown, Mode::Unknown),                 // 0xbb
-            (Instruction::LoadY, Mode::AbsoluteX),                 // 0xbc
-            (Instruction::LoadAccumulator, Mode::AbsoluteX),       // 0xbd
-            (Instruction::LoadX, Mode::AbsoluteY),                 // 0xbe
-            (Instruction::Unknown, Mode::Unknown),                 // 0xbf
-            (Instruction::CompareWithY, Mode::Immediate),          // 0xc0
-            (Instruction::CompareWithAccumulator, Mode::XIndirect), // 0xc1
-            (Instruction::Unknown, Mode::Unknown),                 // 0xc2
-            (Instruction::Unknown, Mode::Unknown),                 // 0xc3
-            (Instruction::CompareWithY, Mode::ZeroPage),           // 0xc4
-            (Instruction::CompareWithAccumulator, Mode::ZeroPage), // 0xc5
-            (Instruction::Decrement, Mode::ZeroPage),              // 0xc6
-            (Instruction::Unknown, Mode::Unknown),                 // 0xc7
-            (Instruction::IncrementY, Mode::Implied),              // 0xc8
-            (Instruction::CompareWithAccumulator, Mode::Immediate), // 0xc9
-            (Instruction::DecrementX, Mode::Accumulator),          // 0xca
-            (Instruction::Unknown, Mode::Unknown),                 // 0xcb
-            (Instruction::CompareWithY, Mode::Absolute),           // 0xcc
-            (Instruction::CompareWithAccumulator, Mode::Absolute), // 0xcd
-            (Instruction::Decrement, Mode::Absolute),              // 0xce
-            (Instruction::Unknown, Mode::Unknown),                 // 0xcf
-            (Instruction::BranchIfNotEqual, Mode::Relative),       // 0xd0
-            (Instruction::CompareWithAccumulator, Mode::IndirectY), // 0xd1
-            (Instruction::Unknown, Mode::Unknown),                 // 0xd2
-            (Instruction::Unknown, Mode::Unknown),                 // 0xd3
-            (Instruction::Unknown, Mode::ZeroPageX),               // 0xd4
-            (Instruction::CompareWithAccumulator, Mode::ZeroPageX), // 0xd5
-            (Instruction::Decrement, Mode::ZeroPageX),             // 0xd6
-            (Instruction::Unknown, Mode::Unknown),                 // 0xd7
-            (Instruction::ClearDecimal, Mode::Implied),            // 0xd8
-            (Instruction::CompareWithAccumulator, Mode::AbsoluteY), // 0xd9
-            (Instruction::Unknown, Mode::Accumulator),             // 0xda
-            (Instruction::Unknown, Mode::Unknown),                 // 0xdb
-            (Instruction::Unknown, Mode::Unknown),                 // 0xdc
-            (Instruction::CompareWithAccumulator, Mode::AbsoluteX), // 0xdd
-            (Instruction::Decrement, Mode::AbsoluteX),             // 0xde
-            (Instruction::Unknown, Mode::Unknown),                 // 0xdf
-            (Instruction::CompareWithX, Mode::Immediate),          // 0xe0
-            (Instruction::SubtractWithCarry, Mode::XIndirect),     // 0xe1
-            (Instruction::Unknown, Mode::Unknown),                 // 0xe2
-            (Instruction::Unknown, Mode::Unknown),                 // 0xe3
-            (Instruction::CompareWithX, Mode::ZeroPage),           // 0xe4
-            (Instruction::SubtractWithCarry, Mode::ZeroPage),      // 0xe5
-            (Instruction::Increment, Mode::ZeroPage),              // 0xe6
-            (Instruction::Unknown, Mode::Unknown),                 // 0xe7
-            (Instruction::IncrementX, Mode::Implied),              // 0xe8
-            (Instruction::SubtractWithCarry, Mode::Immediate),     // 0xe9
-            (Instruction::NoOperation, Mode::Accumulator),         // 0xea
-            (Instruction::Unknown, Mode::Unknown),                 // 0xeb
-            (Instruction::CompareWithX, Mode::Absolute),           // 0xec
-            (Instruction::SubtractWithCarry, Mode::Absolute),      // 0xed
-            (Instruction::Increment, Mode::Absolute),              // 0xee
-            (Instruction::Unknown, Mode::Unknown),                 // 0xef
-            (Instruction::BranchIfEqual, Mode::Relative),          // 0xf0
-            (Instruction::SubtractWithCarry, Mode::IndirectY),     // 0xf1
-            (Instruction::Unknown, Mode::Unknown),                 // 0xf2
-            (Instruction::Unknown, Mode::Unknown),                 // 0xf3
-            (Instruction::Unknown, Mode::ZeroPageX),               // 0xf4
-            (Instruction::SubtractWithCarry, Mode::ZeroPageX),     // 0xf5
-            (Instruction::Increment, Mode::ZeroPageX),             // 0xf6
-            (Instruction::Unknown, Mode::Unknown),                 // 0xf7
-            (Instruction::SetDecimal, Mode::Implied),              // 0xf8
-            (Instruction::SubtractWithCarry, Mode::AbsoluteY),     // 0xf9
-            (Instruction::Unknown, Mode::Accumulator),             // 0xfa
-            (Instruction::Unknown, Mode::Unknown),                 // 0xfb
-            (Instruction::Unknown, Mode::Unknown),                 // 0xfc
-            (Instruction::SubtractWithCarry, Mode::AbsoluteX),     // 0xfd
-            (Instruction::Increment, Mode::AbsoluteX),             // 0xfe
-            (Instruction::Unknown, Mode::Unknown),                 // 0xff
-        ])
-    }
-
-    pub fn get(&self, opcode: u8) -> OpCode {
-        self.0[opcode as usize]
-    }
+pub fn get(opcode: u8) -> OpCode {
+    OP_CODES[opcode as usize]
 }

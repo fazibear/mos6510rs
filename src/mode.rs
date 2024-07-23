@@ -13,5 +13,4 @@ pub enum Mode {
     XIndirect,
     IndirectY,
     Implied,
-    Unknown,
 }

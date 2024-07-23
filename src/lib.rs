@@ -3,40 +3,35 @@ pub mod memory;
 pub mod mode;
 pub mod opcodes;
 pub mod registers;
-pub mod sid;
 pub mod status_flags;
+
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use instruction::Instruction;
 use memory::Memory;
 use mode::Mode;
-use opcodes::OpCodes;
 use registers::Registers;
-use sid::Sid;
 use status_flags::StatusFlags;
 
 pub struct CPU {
     pub registers: Registers,
     pub status_flags: StatusFlags,
-    pub memory: Box<dyn Memory>,
-    pub sid: Box<dyn Sid>,
+    pub memory: Rc<RefCell<dyn Memory>>,
     pub cycles: u64,
-    pub opcodes: OpCodes,
     pub debug: bool,
 }
 
 impl CPU {
-    pub fn new(memory: Box<dyn Memory>, sid: Box<dyn Sid>, debug: bool) -> CPU {
+    pub fn new(memory: Rc<RefCell<dyn Memory>>, debug: bool) -> CPU {
         let cycles = 0;
         let registers = Registers::new();
-        let opcodes = OpCodes::new();
         let status_flags = StatusFlags::new();
         CPU {
             registers,
             memory,
             cycles,
-            opcodes,
             status_flags,
-            sid,
             debug,
         }
     }
@@ -56,335 +51,339 @@ impl CPU {
 
     pub fn step(&mut self) -> u64 {
         self.cycles = 0;
-        let address = self.read_byte_and_increment_pc();
-
-        let (instruction, mode) = self.opcodes.get(address);
+        let opcode = self.read_byte_and_increment_pc();
 
         if self.debug {
             println!(
-                "x:{} y:{} a:{} s:{} f:{} pc:{} a:{}",
+                "x:{} y:{} a:{} s:{} f:{} pc:{} op:{}",
                 self.registers.x,
                 self.registers.y,
                 self.registers.accumulator,
                 self.registers.stack_pointer,
                 self.status_flags.to_byte(),
                 self.registers.program_counter,
-                address
+                opcode
             );
         }
 
-        match instruction {
-            Instruction::AddWithCarry => {
-                let tmp: u16 = self.registers.accumulator as u16
-                    + self.get_address(mode) as u16
-                    + self.status_flags.carry as u16;
-                self.status_flags.carry = tmp & 0x100 != 0;
-                self.registers.accumulator = (tmp & 0xff) as u8;
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-                self.status_flags.overflow =
-                    (self.status_flags.carry as u16 ^ self.status_flags.negative as u16) != 0;
-            }
-            Instruction::AndWithAccumulator => {
-                let tmp = self.get_address(mode);
-                self.registers.accumulator &= tmp;
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-            }
-            Instruction::ArithmeticShiftLeft => {
-                let mut tmp = self.get_address(mode) as u16;
-                tmp <<= 1;
-                self.set_address(mode, tmp as u8);
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-                self.status_flags.carry = tmp & 0x100 != 0;
-            }
-            Instruction::BranchIfCarryClear => {
-                self.branch(!self.status_flags.carry);
-            }
-            Instruction::BranchIfCarrySet => {
-                self.branch(self.status_flags.carry);
-            }
-            Instruction::BranchIfEqual => {
-                self.branch(self.status_flags.zero);
-            }
-            Instruction::BranchIfMinus => {
-                self.branch(self.status_flags.negative);
-            }
-            Instruction::BranchIfNotEqual => {
-                self.branch(!self.status_flags.zero);
-            }
-            Instruction::BranchIfPlus => {
-                self.branch(!self.status_flags.negative);
-            }
-            Instruction::BranchIfOverflowClear => {
-                self.branch(!self.status_flags.overflow);
-            }
-            Instruction::BranchIfOverflowSet => {
-                self.branch(self.status_flags.overflow);
-            }
-            Instruction::BitSet => {
-                let tmp = self.get_address(mode);
-                self.status_flags.zero = (self.registers.accumulator & tmp) == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-                self.status_flags.overflow = tmp & 0x40 != 0;
-            }
-            Instruction::Break => {
-                self.registers.program_counter = 0;
-            }
-            Instruction::ClearCarry => {
-                self.cycles += 2;
-                self.status_flags.carry = false;
-            }
-            Instruction::ClearDecimal => {
-                self.cycles += 2;
-                self.status_flags.decimal = false;
-            }
-            Instruction::ClearInterrupt => {
-                self.cycles += 2;
-                self.status_flags.interrupt = false;
-            }
-            Instruction::ClearOverflow => {
-                self.cycles += 2;
-                self.status_flags.overflow = false;
-            }
-            Instruction::CompareWithAccumulator => {
-                let tmp = self
-                    .registers
-                    .accumulator
-                    .wrapping_sub(self.get_address(mode));
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-                self.status_flags.carry = self.registers.accumulator >= tmp;
-            }
-            Instruction::CompareWithX => {
-                let tmp = self.registers.x.wrapping_sub(self.get_address(mode));
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-                self.status_flags.carry = self.registers.x >= tmp;
-            }
-            Instruction::CompareWithY => {
-                let tmp = self.registers.y.wrapping_sub(self.get_address(mode));
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-                self.status_flags.carry = self.registers.y >= tmp;
-            }
-            Instruction::Decrement => {
-                let tmp = self.get_address(mode).wrapping_sub(1);
-                self.set_address(mode, tmp);
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-            }
-            Instruction::DecrementX => {
-                self.cycles += 2;
-                let tmp = self.registers.x.wrapping_sub(1);
-                self.registers.x = tmp;
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-            }
-            Instruction::DecrementY => {
-                self.cycles += 2;
-                let tmp = self.registers.y.wrapping_sub(1);
-                self.registers.y = tmp;
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-            }
-            Instruction::ExclusiveOrWithAccumulator => {
-                let tmp = self.get_address(mode);
-                self.registers.accumulator ^= tmp;
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-            }
-            Instruction::Increment => {
-                let tmp = self.get_address(mode).wrapping_add(1);
-                self.set_address(mode, tmp);
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-            }
-            Instruction::IncrementX => {
-                self.cycles += 2;
-                let tmp = self.registers.x.wrapping_add(1);
-                self.registers.x = tmp;
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-            }
-            Instruction::IncrementY => {
-                self.cycles += 2;
-                let tmp = self.registers.y.wrapping_add(1);
-                self.registers.y = tmp;
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-            }
-            Instruction::Jump => {
-                self.cycles += 3;
-                let address = self.read_word_and_increment_pc();
-                match mode {
-                    Mode::Absolute => {
-                        self.registers.program_counter = address;
-                    }
-                    Mode::Indirect => {
-                        let address2 = self.read_word(address);
-                        self.registers.program_counter = address2;
-                        self.cycles += 2;
-                    }
-                    _ => panic!("Unimplemented jump addressing mode!"),
+        if let Some((instruction, mode)) = opcodes::get(opcode) {
+            match instruction {
+                Instruction::AddWithCarry => {
+                    let tmp: u16 = self.registers.accumulator as u16
+                        + self.get_address(mode) as u16
+                        + self.status_flags.carry as u16;
+                    self.status_flags.carry = tmp & 0x100 != 0;
+                    self.registers.accumulator = (tmp & 0xff) as u8;
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                    self.status_flags.overflow =
+                        (self.status_flags.carry as u16 ^ self.status_flags.negative as u16) != 0;
                 }
-            }
-            Instruction::JumpSubroutine => {
-                self.cycles += 6;
-                self.push(((self.registers.program_counter + 1) >> 8) as u8);
-                self.push(((self.registers.program_counter + 1) & 0xff) as u8);
-                self.registers.program_counter = self.read_word_and_increment_pc();
-            }
-            Instruction::LoadAccumulator => {
-                self.registers.accumulator = self.get_address(mode);
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-            }
-            Instruction::LoadX => {
-                self.registers.x = self.get_address(mode);
-                self.status_flags.zero = self.registers.x == 0;
-                self.status_flags.negative = self.registers.x & 0x80 != 0;
-            }
-            Instruction::LoadY => {
-                self.registers.y = self.get_address(mode);
-                self.status_flags.zero = self.registers.y == 0;
-                self.status_flags.negative = self.registers.y & 0x80 != 0;
-            }
-            Instruction::LogicalShiftRight => {
-                let tmp = self.get_address(mode) as u16;
-                let tmp2 = (tmp >> 1) & 0xff;
-                self.set_address(mode, tmp2 as u8);
-                self.status_flags.zero = tmp2 == 0;
-                self.status_flags.negative = tmp2 & 0x80 != 0;
-                self.status_flags.carry = tmp & 0x01 != 0;
-            }
-            Instruction::NoOperation => {
-                self.cycles += 2;
-            }
-            Instruction::OrWithAccumulator => {
-                let tmp = self.get_address(mode);
-                self.registers.accumulator |= tmp;
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-            }
-            Instruction::PushAccumulator => {
-                self.cycles += 3;
-                self.push(self.registers.accumulator);
-            }
-            Instruction::PushProcessorStatus => {
-                self.cycles += 3;
-                self.push(self.status_flags.to_byte());
-            }
-            Instruction::PullAccumulator => {
-                self.cycles += 4;
-                self.registers.accumulator = self.pop();
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-            }
-            Instruction::PullProcessorStatus => {
-                self.cycles += 4;
-                let tmp = self.pop();
-                self.status_flags = self.status_flags.from_byte(tmp);
-            }
-            Instruction::RotateLeft => {
-                let mut tmp = self.get_address(mode) as u16;
-                let c = self.status_flags.carry as u16;
-                self.status_flags.carry = (tmp & 0x80) != 0;
-                tmp <<= 1;
-                tmp |= c;
-                tmp &= 0xff;
-                self.set_address(mode, tmp as u8);
-                self.status_flags.negative = tmp & 0x80 != 0;
-                self.status_flags.zero = tmp == 0;
-            }
-            Instruction::RotateRight => {
-                let mut tmp = self.get_address(mode) as u16;
-                let c = if (self.status_flags.carry as u16) != 0 {
-                    128
-                } else {
-                    0
-                };
-                self.status_flags.carry = tmp & 1 == 1;
-                tmp >>= 1;
-                tmp |= c;
-                self.set_address(mode, tmp as u8);
-                self.status_flags.zero = tmp == 0;
-                self.status_flags.negative = tmp & 0x80 != 0;
-            }
-            Instruction::ReturnFromInterrupt | Instruction::ReturnFromSubroutine => {
-                self.cycles += 6;
-                let mut tmp = self.pop() as u16;
-                tmp |= (self.pop() as u16) << 8;
-                self.registers.program_counter = tmp + 1;
-            }
-            Instruction::SubtractWithCarry => {
-                let tmp = self.get_address(mode) as u16 ^ 0xff;
-                let tmp2 = self.registers.accumulator as u16 + tmp + self.status_flags.carry as u16;
-                self.status_flags.carry = tmp2 & 0x100 != 0;
-                self.registers.accumulator = tmp2 as u8;
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator > 127;
-                self.status_flags.overflow = self.status_flags.carry ^ self.status_flags.negative;
-            }
-            Instruction::SetCarry => {
-                self.cycles += 2;
-                self.status_flags.carry = true;
-            }
-            Instruction::SetDecimal => {
-                self.cycles += 2;
-                self.status_flags.decimal = true;
-            }
-            Instruction::SetInterruptDisable => {
-                self.cycles += 2;
-                self.status_flags.interrupt = true;
-            }
-            Instruction::StoreAccumulator => {
-                self.put_address(mode, self.registers.accumulator);
-            }
-            Instruction::StoreX => {
-                self.put_address(mode, self.registers.x);
-            }
-            Instruction::StoreY => {
-                self.put_address(mode, self.registers.y);
-            }
-            Instruction::TransferAccumulatorToX => {
-                self.cycles += 2;
-                self.registers.x = self.registers.accumulator;
-                self.status_flags.zero = self.registers.x == 0;
-                self.status_flags.negative = self.registers.x & 0x80 != 0;
-            }
-            Instruction::TransferAccumulatorToY => {
-                self.cycles += 2;
-                self.registers.y = self.registers.accumulator;
-                self.status_flags.zero = self.registers.y == 0;
-                self.status_flags.negative = self.registers.y & 0x80 != 0;
-            }
-            Instruction::TransferStackPointerToX => {
-                self.cycles += 2;
-                self.registers.x = self.registers.stack_pointer;
-                self.status_flags.zero = self.registers.x == 0;
-                self.status_flags.negative = self.registers.x & 0x80 != 0;
-            }
-            Instruction::TransferXToAccumulator => {
-                self.cycles += 2;
-                self.registers.accumulator = self.registers.x;
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-            }
-            Instruction::TransferXToStackPointer => {
-                self.cycles += 2;
-                self.registers.stack_pointer = self.registers.x;
-            }
-            Instruction::TransferYToAccumulator => {
-                self.cycles += 2;
-                self.registers.accumulator = self.registers.y;
-                self.status_flags.zero = self.registers.accumulator == 0;
-                self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
-            }
+                Instruction::AndWithAccumulator => {
+                    let tmp = self.get_address(mode);
+                    self.registers.accumulator &= tmp;
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                }
+                Instruction::ArithmeticShiftLeft => {
+                    let mut tmp = self.get_address(mode) as u16;
+                    tmp <<= 1;
+                    self.set_address(mode, tmp as u8);
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                    self.status_flags.carry = tmp & 0x100 != 0;
+                }
+                Instruction::BranchIfCarryClear => {
+                    self.branch(!self.status_flags.carry);
+                }
+                Instruction::BranchIfCarrySet => {
+                    self.branch(self.status_flags.carry);
+                }
+                Instruction::BranchIfEqual => {
+                    self.branch(self.status_flags.zero);
+                }
+                Instruction::BranchIfMinus => {
+                    self.branch(self.status_flags.negative);
+                }
+                Instruction::BranchIfNotEqual => {
+                    self.branch(!self.status_flags.zero);
+                }
+                Instruction::BranchIfPlus => {
+                    self.branch(!self.status_flags.negative);
+                }
+                Instruction::BranchIfOverflowClear => {
+                    self.branch(!self.status_flags.overflow);
+                }
+                Instruction::BranchIfOverflowSet => {
+                    self.branch(self.status_flags.overflow);
+                }
+                Instruction::BitSet => {
+                    let tmp = self.get_address(mode);
+                    self.status_flags.zero = (self.registers.accumulator & tmp) == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                    self.status_flags.overflow = tmp & 0x40 != 0;
+                }
+                Instruction::Break => {
+                    self.registers.program_counter = 0;
+                }
+                Instruction::ClearCarry => {
+                    self.cycles += 2;
+                    self.status_flags.carry = false;
+                }
+                Instruction::ClearDecimal => {
+                    self.cycles += 2;
+                    self.status_flags.decimal = false;
+                }
+                Instruction::ClearInterrupt => {
+                    self.cycles += 2;
+                    self.status_flags.interrupt = false;
+                }
+                Instruction::ClearOverflow => {
+                    self.cycles += 2;
+                    self.status_flags.overflow = false;
+                }
+                Instruction::CompareWithAccumulator => {
+                    let tmp = self
+                        .registers
+                        .accumulator
+                        .wrapping_sub(self.get_address(mode));
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                    self.status_flags.carry = self.registers.accumulator >= tmp;
+                }
+                Instruction::CompareWithX => {
+                    let tmp = self.registers.x.wrapping_sub(self.get_address(mode));
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                    self.status_flags.carry = self.registers.x >= tmp;
+                }
+                Instruction::CompareWithY => {
+                    let tmp = self.registers.y.wrapping_sub(self.get_address(mode));
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                    self.status_flags.carry = self.registers.y >= tmp;
+                }
+                Instruction::Decrement => {
+                    let tmp = self.get_address(mode).wrapping_sub(1);
+                    self.set_address(mode, tmp);
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                }
+                Instruction::DecrementX => {
+                    self.cycles += 2;
+                    let tmp = self.registers.x.wrapping_sub(1);
+                    self.registers.x = tmp;
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                }
+                Instruction::DecrementY => {
+                    self.cycles += 2;
+                    let tmp = self.registers.y.wrapping_sub(1);
+                    self.registers.y = tmp;
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                }
+                Instruction::ExclusiveOrWithAccumulator => {
+                    let tmp = self.get_address(mode);
+                    self.registers.accumulator ^= tmp;
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                }
+                Instruction::Increment => {
+                    let tmp = self.get_address(mode).wrapping_add(1);
+                    self.set_address(mode, tmp);
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                }
+                Instruction::IncrementX => {
+                    self.cycles += 2;
+                    let tmp = self.registers.x.wrapping_add(1);
+                    self.registers.x = tmp;
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                }
+                Instruction::IncrementY => {
+                    self.cycles += 2;
+                    let tmp = self.registers.y.wrapping_add(1);
+                    self.registers.y = tmp;
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                }
+                Instruction::Jump => {
+                    self.cycles += 3;
 
-            _ => panic!("Unknown instruction: {}", instruction as u8),
-        };
+                    let address = self.read_word_and_increment_pc();
+                    match mode {
+                        Mode::Absolute => {
+                            self.registers.program_counter = address;
+                        }
+                        Mode::Indirect => {
+                            let address2 = self.read_word(address);
+                            self.registers.program_counter = address2;
+                            self.cycles += 2;
+                        }
+                        _ => panic!("Unimplemented jump addressing mode!"),
+                    }
+                }
+                Instruction::JumpSubroutine => {
+                    self.cycles += 6;
+                    self.push(((self.registers.program_counter + 1) >> 8) as u8);
+                    self.push(((self.registers.program_counter + 1) & 0xff) as u8);
+                    self.registers.program_counter = self.read_word_and_increment_pc();
+                }
+                Instruction::LoadAccumulator => {
+                    self.registers.accumulator = self.get_address(mode);
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                }
+                Instruction::LoadX => {
+                    self.registers.x = self.get_address(mode);
+                    self.status_flags.zero = self.registers.x == 0;
+                    self.status_flags.negative = self.registers.x & 0x80 != 0;
+                }
+                Instruction::LoadY => {
+                    self.registers.y = self.get_address(mode);
+                    self.status_flags.zero = self.registers.y == 0;
+                    self.status_flags.negative = self.registers.y & 0x80 != 0;
+                }
+                Instruction::LogicalShiftRight => {
+                    let tmp = self.get_address(mode) as u16;
+                    let tmp2 = (tmp >> 1) & 0xff;
+                    self.set_address(mode, tmp2 as u8);
+                    self.status_flags.zero = tmp2 == 0;
+                    self.status_flags.negative = tmp2 & 0x80 != 0;
+                    self.status_flags.carry = tmp & 0x01 != 0;
+                }
+                Instruction::NoOperation => {
+                    self.cycles += 2;
+                }
+                Instruction::OrWithAccumulator => {
+                    let tmp = self.get_address(mode);
+                    self.registers.accumulator |= tmp;
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                }
+                Instruction::PushAccumulator => {
+                    self.cycles += 3;
+                    self.push(self.registers.accumulator);
+                }
+                Instruction::PushProcessorStatus => {
+                    self.cycles += 3;
+                    self.push(self.status_flags.to_byte());
+                }
+                Instruction::PullAccumulator => {
+                    self.cycles += 4;
+                    self.registers.accumulator = self.pop();
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                }
+                Instruction::PullProcessorStatus => {
+                    self.cycles += 4;
+                    let tmp = self.pop();
+                    self.status_flags = self.status_flags.from_byte(tmp);
+                }
+                Instruction::RotateLeft => {
+                    let mut tmp = self.get_address(mode) as u16;
+                    let c = self.status_flags.carry as u16;
+                    self.status_flags.carry = (tmp & 0x80) != 0;
+                    tmp <<= 1;
+                    tmp |= c;
+                    tmp &= 0xff;
+                    self.set_address(mode, tmp as u8);
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                    self.status_flags.zero = tmp == 0;
+                }
+                Instruction::RotateRight => {
+                    let mut tmp = self.get_address(mode) as u16;
+                    let c = if (self.status_flags.carry as u16) != 0 {
+                        128
+                    } else {
+                        0
+                    };
+                    self.status_flags.carry = tmp & 1 == 1;
+                    tmp >>= 1;
+                    tmp |= c;
+                    self.set_address(mode, tmp as u8);
+                    self.status_flags.zero = tmp == 0;
+                    self.status_flags.negative = tmp & 0x80 != 0;
+                }
+                Instruction::ReturnFromInterrupt | Instruction::ReturnFromSubroutine => {
+                    self.cycles += 6;
+                    let mut tmp = self.pop() as u16;
+                    tmp |= (self.pop() as u16) << 8;
+                    self.registers.program_counter = tmp + 1;
+                }
+                Instruction::SubtractWithCarry => {
+                    let tmp = self.get_address(mode) as u16 ^ 0xff;
+                    let tmp2 =
+                        self.registers.accumulator as u16 + tmp + self.status_flags.carry as u16;
+                    self.status_flags.carry = tmp2 & 0x100 != 0;
+                    self.registers.accumulator = tmp2 as u8;
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator > 127;
+                    self.status_flags.overflow =
+                        self.status_flags.carry ^ self.status_flags.negative;
+                }
+                Instruction::SetCarry => {
+                    self.cycles += 2;
+                    self.status_flags.carry = true;
+                }
+                Instruction::SetDecimal => {
+                    self.cycles += 2;
+                    self.status_flags.decimal = true;
+                }
+                Instruction::SetInterruptDisable => {
+                    self.cycles += 2;
+                    self.status_flags.interrupt = true;
+                }
+                Instruction::StoreAccumulator => {
+                    self.put_address(mode, self.registers.accumulator);
+                }
+                Instruction::StoreX => {
+                    self.put_address(mode, self.registers.x);
+                }
+                Instruction::StoreY => {
+                    self.put_address(mode, self.registers.y);
+                }
+                Instruction::TransferAccumulatorToX => {
+                    self.cycles += 2;
+                    self.registers.x = self.registers.accumulator;
+                    self.status_flags.zero = self.registers.x == 0;
+                    self.status_flags.negative = self.registers.x & 0x80 != 0;
+                }
+                Instruction::TransferAccumulatorToY => {
+                    self.cycles += 2;
+                    self.registers.y = self.registers.accumulator;
+                    self.status_flags.zero = self.registers.y == 0;
+                    self.status_flags.negative = self.registers.y & 0x80 != 0;
+                }
+                Instruction::TransferStackPointerToX => {
+                    self.cycles += 2;
+                    self.registers.x = self.registers.stack_pointer;
+                    self.status_flags.zero = self.registers.x == 0;
+                    self.status_flags.negative = self.registers.x & 0x80 != 0;
+                }
+                Instruction::TransferXToAccumulator => {
+                    self.cycles += 2;
+                    self.registers.accumulator = self.registers.x;
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                }
+                Instruction::TransferXToStackPointer => {
+                    self.cycles += 2;
+                    self.registers.stack_pointer = self.registers.x;
+                }
+                Instruction::TransferYToAccumulator => {
+                    self.cycles += 2;
+                    self.registers.accumulator = self.registers.y;
+                    self.status_flags.zero = self.registers.accumulator == 0;
+                    self.status_flags.negative = self.registers.accumulator & 0x80 != 0;
+                }
+            };
+        } else {
+            panic!("Unknown opcode: {}", opcode);
+        }
+
         self.cycles
     }
 
@@ -420,7 +419,7 @@ impl CPU {
     }
 
     pub fn read_byte(&self, address: u16) -> u8 {
-        self.memory.as_ref().read(address)
+        self.memory.borrow().read(address)
     }
 
     pub fn read_word_and_increment_pc(&mut self) -> u16 {
@@ -436,14 +435,7 @@ impl CPU {
     }
 
     fn write_memory(&mut self, address: u16, value: u8) {
-        if self.debug {
-            println!("{} <- {}", address, value);
-        }
-        if (address & 0xfc00) == 0xd400 {
-            self.sid.write((address & 0x1f) as u8, value);
-        } else {
-            self.memory.as_mut().write(address, value);
-        }
+        self.memory.borrow_mut().write(address, value);
     }
 
     fn increment_pc(&mut self) {
@@ -614,7 +606,7 @@ impl CPU {
             Mode::Accumulator => {
                 self.registers.accumulator = value;
             }
-            _ => panic!("Unimplemented put_address addressing mode!"),
+            _ => panic!("Unimplemented opcode!"),
         }
     }
 }

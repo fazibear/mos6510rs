@@ -2,7 +2,7 @@
 name = "mos6510rs"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/fazibear/mos6510rs"
+license-file = "LICENSE"
+description = "MOS6510 emulator"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]

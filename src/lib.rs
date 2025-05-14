@@ -64,12 +64,6 @@ impl CPU {
         self.read_byte_callback = Some(fun);
     }
 
-    pub fn load(&mut self, data: &[u8], offset: u16) {
-        for (i, &b) in data.iter().enumerate() {
-            self.memory[offset as usize + i] = b;
-        }
-    }
-
     pub fn reset(&mut self) {
         let program_counter = self.read_word(0xfffc);
         self.reset_to(program_counter, 0x00);
@@ -468,6 +462,10 @@ impl CPU {
             write_byte_callback(address, value)
         }
         self.memory[address as usize] = value;
+    }
+
+    pub fn write_slice(&mut self, data: &[u8], offset: u16) {
+        self.memory[offset as usize..data.len()].copy_from_slice(data);
     }
 
     fn increment_pc(&mut self) {

@@ -1,36 +1,44 @@
-pub mod instruction;
-pub mod memory;
-pub mod mode;
-pub mod opcodes;
-pub mod registers;
-pub mod status_flags;
+mod instruction;
+mod mode;
+mod opcodes;
+mod registers;
+mod status_flags;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use instruction::Instruction;
-use memory::Memory;
-use mode::Mode;
-use opcodes::OpCode;
-use registers::Registers;
-use status_flags::StatusFlags;
+pub use instruction::Instruction;
+pub use mode::Mode;
+pub use opcodes::OpCode;
+pub use registers::Registers;
+pub use status_flags::StatusFlags;
 
 pub struct CPU {
     pub registers: Registers,
     pub status_flags: StatusFlags,
-    pub memory: Rc<RefCell<dyn Memory>>,
+    pub memory: [u8; 65536],
     pub cycles: u64,
     pub current_opcode: OpCode,
+
     pub step_callback: Option<Box<dyn Fn(&CPU)>>,
+    pub read_byte_callback: Option<Box<dyn Fn(u16)>>,
+    pub write_byte_callback: Option<Box<dyn Fn(u16, u8)>>,
+}
+
+impl Default for CPU {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CPU {
-    pub fn new(memory: Rc<RefCell<dyn Memory>>) -> CPU {
+    pub fn new() -> CPU {
         let cycles = 0;
         let registers = Registers::new();
         let status_flags = StatusFlags::new();
         let current_opcode = None;
+        let memory = [0; 65536];
+
         let step_callback = None;
+        let read_byte_callback = None;
+        let write_byte_callback = None;
 
         CPU {
             registers,
@@ -39,11 +47,27 @@ impl CPU {
             status_flags,
             current_opcode,
             step_callback,
+            read_byte_callback,
+            write_byte_callback,
         }
     }
 
     pub fn set_step_callback(&mut self, fun: Box<dyn Fn(&CPU)>) {
         self.step_callback = Some(fun);
+    }
+
+    pub fn set_write_byte_callback(&mut self, fun: Box<dyn Fn(u16, u8)>) {
+        self.write_byte_callback = Some(fun);
+    }
+
+    pub fn set_read_byte_callback(&mut self, fun: Box<dyn Fn(u16)>) {
+        self.read_byte_callback = Some(fun);
+    }
+
+    pub fn load(&mut self, data: &[u8], offset: u16) {
+        for (i, &b) in data.iter().enumerate() {
+            self.memory[offset as usize + i] = b;
+        }
     }
 
     pub fn reset(&mut self) {
@@ -390,7 +414,7 @@ impl CPU {
     }
 
     pub fn push(&mut self, value: u8) {
-        self.write_memory(0x100 + self.registers.stack_pointer as u16, value);
+        self.write_byte(0x100 + self.registers.stack_pointer as u16, value);
         self.registers.stack_pointer = self.registers.stack_pointer.saturating_sub(1);
     }
 
@@ -421,7 +445,10 @@ impl CPU {
     }
 
     pub fn read_byte(&self, address: u16) -> u8 {
-        self.memory.borrow().read(address)
+        if let Some(ref read_byte_callback) = self.read_byte_callback {
+            read_byte_callback(address)
+        }
+        self.memory[address as usize]
     }
 
     pub fn read_word_and_increment_pc(&mut self) -> u16 {
@@ -436,8 +463,11 @@ impl CPU {
         mem
     }
 
-    fn write_memory(&mut self, address: u16, value: u8) {
-        self.memory.borrow_mut().write(address, value);
+    fn write_byte(&mut self, address: u16, value: u8) {
+        if let Some(ref write_byte_callback) = self.write_byte_callback {
+            write_byte_callback(address, value)
+        }
+        self.memory[address as usize] = value;
     }
 
     fn increment_pc(&mut self) {
@@ -523,7 +553,7 @@ impl CPU {
             Mode::Absolute => {
                 self.cycles += 2;
                 let address = self.read_word(self.registers.program_counter - 2);
-                self.write_memory(address, value);
+                self.write_byte(address, value);
             }
             Mode::AbsoluteX => {
                 self.cycles += 3;
@@ -532,18 +562,18 @@ impl CPU {
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles -= 1;
                 }
-                self.write_memory(address2, value);
+                self.write_byte(address2, value);
             }
             Mode::ZeroPage => {
                 self.cycles += 2;
                 let address = self.read_byte(self.registers.program_counter - 1) as u16;
-                self.write_memory(address, value);
+                self.write_byte(address, value);
             }
             Mode::ZeroPageX => {
                 self.cycles += 2;
                 let mut address = self.read_byte(self.registers.program_counter - 1) as u16;
                 address += self.registers.x as u16;
-                self.write_memory(address & 0xff, value);
+                self.write_byte(address & 0xff, value);
             }
             Mode::Accumulator => {
                 self.registers.accumulator = value;
@@ -557,13 +587,13 @@ impl CPU {
             Mode::Absolute => {
                 self.cycles += 4;
                 let address = self.read_word_and_increment_pc();
-                self.write_memory(address, value);
+                self.write_byte(address, value);
             }
             Mode::AbsoluteX => {
                 self.cycles += 4;
                 let address = self.read_word_and_increment_pc();
                 let address2 = address + self.registers.x as u16;
-                self.write_memory(address2, value);
+                self.write_byte(address2, value);
             }
             Mode::AbsoluteY => {
                 self.cycles += 4;
@@ -572,38 +602,38 @@ impl CPU {
                 if (address2 & 0xff00) != (address & 0xff00) {
                     self.cycles += 1
                 };
-                self.write_memory(address2, value);
+                self.write_byte(address2, value);
             }
             Mode::ZeroPage => {
                 self.cycles += 3;
                 let address = self.read_byte_and_increment_pc() as u16;
-                self.write_memory(address, value);
+                self.write_byte(address, value);
             }
             Mode::ZeroPageX => {
                 self.cycles += 4;
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 address += self.registers.x as u16;
-                self.write_memory(address & 0xff, value);
+                self.write_byte(address & 0xff, value);
             }
             Mode::ZeroPageY => {
                 self.cycles += 4;
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 address += self.registers.y as u16;
-                self.write_memory(address & 0xff, value);
+                self.write_byte(address & 0xff, value);
             }
             Mode::XIndirect => {
                 self.cycles += 6;
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 address += self.registers.x as u16;
                 let address2 = self.read_word(address & 0xff);
-                self.write_memory(address2, value);
+                self.write_byte(address2, value);
             }
             Mode::IndirectY => {
                 self.cycles += 5;
                 let mut address = self.read_byte_and_increment_pc() as u16;
                 let address2 = self.read_word(address);
                 address = address2 + self.registers.y as u16;
-                self.write_memory(address, value);
+                self.write_byte(address, value);
             }
             Mode::Accumulator => {
                 self.registers.accumulator = value;

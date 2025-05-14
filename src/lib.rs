@@ -465,7 +465,7 @@ impl CPU {
     }
 
     pub fn write_slice(&mut self, data: &[u8], offset: u16) {
-        self.memory[offset as usize..data.len()].copy_from_slice(data);
+        self.memory[offset as usize..offset as usize + data.len()].copy_from_slice(data);
     }
 
     fn increment_pc(&mut self) {
